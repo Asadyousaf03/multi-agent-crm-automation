@@ -1,0 +1,9 @@
+{
+  "GOOGLE_API_KEY": "your_google_api_key_here",
+  "HUBSPOT_API_KEY": "your_hubspot_api_key_here",
+  "SMTP_SERVER": "smtp.gmail.com",
+  "SMTP_PORT": "587",
+  "SMTP_USER": "your_email@gmail.com",
+  "SMTP_PASS": "your_app_password",
+  "FROM_EMAIL": "your_email@gmail.com"
+}

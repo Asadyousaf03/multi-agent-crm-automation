@@ -1,0 +1,8 @@
+langgraph
+langchain-google-genai
+hubspot-api-client
+transformers
+langchain-core
+torch
+sentence-transformers
+pydantic
