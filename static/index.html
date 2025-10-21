@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent CRM Automation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4 max-w-4xl">
+        <h1 class="text-3xl font-bold text-center text-blue-600 mb-6">Multi-Agent CRM Automation</h1>
+        <p class="text-center text-gray-600 mb-4">Automate HubSpot CRM tasks and email notifications with AI agents.</p>
+
+        <!-- Query Input Form -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-xl font-semibold mb-4">Enter Your Query</h2>
+            <form id="query-form" class="space-y-4">
+                <textarea
+                    id="query-input"
+                    class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows="4"
+                    placeholder="e.g., Create a new contact for John Doe with email john.doe@example.com and send a confirmation email"
+                ></textarea>
+                <button
+                    type="submit"
+                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition"
+                >
+                    Submit Query
+                </button>
+            </form>
+        </div>
+
+        <!-- Output Log -->
+        <div id="output-log" class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Agent Output</h2>
+            <div id="log-content" class="text-gray-700 space-y-2"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('query-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = document.getElementById('query-input').value.trim();
+            if (!query) {
+                alert('Please enter a query.');
+                return;
+            }
+
+            const logContent = document.getElementById('log-content');
+            logContent.innerHTML += `<p class="text-blue-600 font-semibold">Query: ${query}</p>`;
+
+            try {
+                const response = await fetch('http://localhost:5000/api/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query }),
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    data.output.forEach(event => {
+                        const { agent, message, toolCalls, toolResult } = event;
+                        logContent.innerHTML += `<p><strong>${agent}:</strong> ${message}</p>`;
+                        if (toolCalls) {
+                            logContent.innerHTML += `<p class="text-gray-500">Tool Calls: ${JSON.stringify(toolCalls)}</p>`;
+                        }
+                        if (toolResult) {
+                            logContent.innerHTML += `<p class="text-green-600">Tool Result: ${toolResult}</p>`;
+                        }
+                    });
+                } else {
+                    logContent.innerHTML += `<p class="text-red-600">Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                logContent.innerHTML += `<p class="text-red-600">Error: Failed to connect to server - ${error.message}</p>`;
+            }
+
+            // Scroll to bottom of log
+            logContent.scrollTop = logContent.scrollHeight;
+        });
+    </script>
+</body>
+</html>

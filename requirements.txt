@@ -6,3 +6,4 @@ langchain-core
 torch
 sentence-transformers
 pydantic
+flask

@@ -9,15 +9,17 @@ AI-powered system using LangGraph, Gemini Flash 1.5, and Hugging Face embeddings
 
 ## Setup
 
-### Option 1: Google Colab (Recommended for Testing)
+### Option 1: Google Colab (Recommended for testing)
 1. Open [Multi_Agent_CRM_Automation.ipynb](Multi_Agent_CRM_Automation.ipynb) in [Colab](https://colab.research.google.com).
-2. Upload `config.json` (use `config_template.json` with your keys and remane to `config.json`) to Colab's Files tab or use the one i ahev provided to you in Email.
-3. Run cells in order: Install dependencies, main code, then input queries.
+2. Upload `config.json` to `/content/` with valid API keys.
+3. Run cells to install dependencies and execute the workflow.
 
-### Option 2: Local Python (.py)
+### Option 2: Web UI with Flask
 1. Install dependencies: `pip install -r requirements.txt`.
-2. Use `config_template` or and add your API keys, copy  `config.json` send in gmail.
-3. Run: `python main.py`.
+2. Copy `config.json.template` to `config.json` and add API keys (use Gmail App Password for `SMTP_PASS`).
+3. Run the Flask server: `python multi_agent_crm_automation.py`.
+4. Open `static/index.html` in a browser or serve it via a web server (e.g., `python -m http.server 8000` in the repo root).
+5. Enter queries in the UI (e.g., "Create a new contact for John Doe with email john.doe@example.com and send a confirmation email").
 
 ## Configuration
 - Get keys: Google AI Studio (Gemini), HubSpot Developers, Gmail App Password (SMTP).

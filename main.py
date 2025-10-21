@@ -1,8 +1,4 @@
-
-
-# Install Dependencies (run this manually or via pip install -r requirements.txt )
-# !pip install -qU langgraph langchain-google-genai hubspot-api-client transformers langchain-core
-
+from flask import Flask, request, jsonify
 import os
 import json
 import logging
@@ -31,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Load configurations from JSON file
 try:
-    with open('config.json', 'r') as f:  # Changed from '/content/config.json' for local run
+    with open('config.json', 'r') as f:
         config = json.load(f)
 except FileNotFoundError:
     logger.error("config.json not found. Please create it with API keys.")
@@ -191,6 +187,7 @@ hubspot_tools = [create_contact, update_contact, create_deal, update_deal]
 def send_email(to_email: str, subject: str, body: str):
     """Send an email notification."""
     logger.info(f"Sending email to {to_email} with subject: {subject}")
+    logger.info(f"SMTP Config: server={os.environ['SMTP_SERVER']}, port={os.environ['SMTP_PORT']}, user={os.environ['SMTP_USER']}")
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = os.environ["FROM_EMAIL"]
@@ -215,7 +212,7 @@ email_tools = [send_email]
 class TransferToHubspot(BaseModel):
     """Delegate task to HubSpot Agent."""
     task_description: str = Field(description="Clear task for HubSpot Agent, e.g., 'Create contact with properties: {'firstname': 'Asadullah', 'email': 'asadullahyousaf786@gmail.com'}'")
-# add valid email adress where you want to send the confirmation mail.
+
 class TransferToEmail(BaseModel):
     """Delegate task to Email Agent."""
     task_description: str = Field(description="Clear task for Email Agent, e.g., 'Send confirmation email to asadullahyousaf786@gmail.com with subject \"Contact Created\" and body containing contact ID'")
@@ -226,7 +223,6 @@ from langchain_core.prompts import ChatPromptTemplate
 def create_agent_node(llm, tools, system_prompt):
     def agent_node(state: MessagesState):
         try:
-            # Extract task_description from supervisor's tool call
             task = ""
             for msg in reversed(state["messages"]):
                 if isinstance(msg, AIMessage) and msg.tool_calls:
@@ -248,17 +244,18 @@ def create_agent_node(llm, tools, system_prompt):
 
 # HubSpot Agent
 hubspot_system_prompt = (
-    "You are the HubSpot Agent. Use the current task to prepare dynamic payloads and call tools like create_contact, update_contact, etc.\n"
-    "After receiving tool results, output a summary (e.g., 'Contact created with ID: xxx'). Do not call more tools if task is complete.\n"
-    "Handle errors and include them in the summary."
+    "You are the HubSpot Agent. Focus exclusively on CRM tasks (create/update contacts or deals) using the provided task description. "
+    "Call the appropriate tool (e.g., create_contact, update_contact) and return a summary of the result (e.g., 'Contact created with ID: xxx'). "
+    "Do not attempt email-related tasks, as these are handled by the Email Agent. "
+    "Handle errors and include them in the summary without calling additional tools."
 )
 hubspot_agent = create_agent_node(llm, hubspot_tools, hubspot_system_prompt)
 hubspot_tool_node = ToolNode(tools=hubspot_tools)
 
 # Email Agent
 email_system_prompt = (
-    "You are the Email Agent. Use the current task to generate email content and call send_email.\n"
-    "After receiving tool results, output a summary (e.g., 'Email sent successfully'). Do not call more tools if task is complete.\n"
+    "You are the Email Agent. Use the current task to generate email content and call send_email. "
+    "After receiving tool results, output a summary (e.g., 'Email sent successfully'). Do not call more tools if task is complete. "
     "Handle errors and include them in the summary."
 )
 email_agent = create_agent_node(llm, email_tools, email_system_prompt)
@@ -304,8 +301,11 @@ graph.add_node("email_tools", email_tool_node)
 def supervisor_router(state: MessagesState):
     last_msg = state["messages"][-1]
     if not isinstance(last_msg, AIMessage) or not last_msg.tool_calls:
-        if "Final summary" in last_msg.content:
-            return END
+        for msg in reversed(state["messages"]):
+            if isinstance(msg, ToolMessage) and '"success": false' in msg.content:
+                return END
+            if isinstance(msg, AIMessage) and "Final summary" in msg.content:
+                return END
         return "supervisor"
 
     tool_call_name = last_msg.tool_calls[0]["name"]
@@ -317,14 +317,6 @@ def supervisor_router(state: MessagesState):
 
 graph.set_entry_point("supervisor")
 graph.add_conditional_edges("supervisor", supervisor_router, {"hubspot_agent": "hubspot_agent", "email_agent": "email_agent", END: END, "supervisor": "supervisor"})
-
-# Agent-Tool Loops
-def agent_router(state: MessagesState, agent_name: str):
-    last_msg = state["messages"][-1]
-    if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
-        return f"{agent_name}_tools"
-    return "supervisor"
-
 graph.add_conditional_edges("hubspot_agent", lambda s: agent_router(s, "hubspot"), {"hubspot_tools": "hubspot_tools", "supervisor": "supervisor"})
 graph.add_edge("hubspot_tools", "hubspot_agent")
 graph.add_conditional_edges("email_agent", lambda s: agent_router(s, "email"), {"email_tools": "email_tools", "supervisor": "supervisor"})
@@ -333,35 +325,40 @@ graph.add_edge("email_tools", "email_agent")
 # Compile
 app = graph.compile()
 
-# Run the Workflow with User Input
-# Prompt user to enter a query
-user_query = input("Enter your query (e.g., 'Create a new contact for Asadullah with email asadullahyousaf786@gmail.com and send a confirmation email to him'): ")
+# Flask App
+flask_app = Flask(__name__)
 
-# Log initial classification
-initial_agent = classify_query(user_query)
-logger.info(f"Embedding-based initial classification: {initial_agent}")
-print(f"Embedding-based initial classification: {initial_agent}")
+@flask_app.route('/api/query', methods=['POST'])
+def handle_query():
+    try:
+        data = request.get_json()
+        user_query = data.get('query')
+        if not user_query:
+            return jsonify({"error": "No query provided"}), 400
 
-# Stream the workflow with rate limiting
-try:
-    for event in app.stream({"messages": [HumanMessage(content=user_query)]}, config={"recursion_limit": 20}):
-        for key, value in event.items():
-            print(f"Output from {key}:")
-            if "messages" in value:
+        initial_agent = classify_query(user_query)
+        logger.info(f"Embedding-based initial classification: {initial_agent}")
+
+        output = []
+        for event in app.stream({"messages": [HumanMessage(content=user_query)]}, config={"recursion_limit": 20}):
+            for key, value in event.items():
                 for msg in value["messages"]:
+                    entry = {"agent": key}
                     if isinstance(msg, AIMessage):
-                        print(f"AI: {msg.content}")
+                        entry["message"] = msg.content
                         if msg.tool_calls:
-                            print(f"Tool Calls: {msg.tool_calls}")
+                            entry["toolCalls"] = msg.tool_calls
                     elif isinstance(msg, ToolMessage):
-                        print(f"Tool Result: {msg.content}")
+                        entry["toolResult"] = msg.content
                     elif isinstance(msg, HumanMessage):
-                        print(f"Human: {msg.content}")
-            print("---")
-            time.sleep(6) 
-except Exception as e:
-    logger.error(f"Stream error: {str(e)}")
-    print(f"Error during streaming: {str(e)}")
+                        entry["message"] = msg.content
+                    output.append(entry)
+                time.sleep(0.1)  # Reduced rate limiting for API
+
+        return jsonify({"output": output})
+    except Exception as e:
+        logger.error(f"API error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    pass
+    flask_app.run(debug=True, host='0.0.0.0', port=5000)
