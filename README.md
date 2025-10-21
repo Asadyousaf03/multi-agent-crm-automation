@@ -33,6 +33,6 @@ AI-powered system using LangGraph, Gemini Flash 1.5, and Hugging Face embeddings
 - Common issues: Invalid API keys, rate limits (6s delay included).
 
 ## Result
-<image-card alt="path not found check images folder" src="images/output.png" ></image-card>
+I have saved the screenshot in images folder.
 
 Questions?  Email at: asaduyousaf@gmail.com
