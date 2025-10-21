@@ -33,5 +33,5 @@ AI-powered system using LangGraph, Gemini Flash 1.5, and Hugging Face embeddings
 - Common issues: Invalid API keys, rate limits (6s delay included).
 
 ## Result
-<image-card alt="CRM Automation Output" src="https://raw.githubusercontent.com/asadyousaf03/multi-agent-crm-automation/main/images/output.png"></image-card>
+<image-card alt="CRM Automation Output" src="https://raw.githubusercontent.com/Asadyousaf03/multi-agent-crm-automation/main/images/output.png" ></image-card>
 Questions?  Email at: asaduyousaf@gmail.com
