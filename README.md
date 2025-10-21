@@ -1,6 +1,6 @@
 # Multi-Agent CRM Automation System
 
-AI-powered system using LangGraph, Gemini Flash 1.5, and Hugging Face embeddings to automate HubSpot CRM tasks (create/update contacts/deals) and send email notifications.
+AI-powered system using LangGraph, Gemini Flash 2.5, and Hugging Face embeddings to automate HubSpot CRM tasks (create/update contacts/deals) and send email notifications.
 
 ## Features
 - Multi-agent architecture: Supervisor, HubSpot Agent, Email Agent.
